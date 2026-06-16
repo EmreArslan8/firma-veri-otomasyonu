@@ -29,9 +29,16 @@ def veri_dogrula(firma_adi, index):
         "durum": "Başarılı"
     }
 
+@app.route('/ping')
+@app.route('/api/ping')
+def ping():
+    return jsonify({"status": "ok", "message": "Server is running"})
+
+@app.route('/yukle', methods=['POST'])
 @app.route('/api/yukle', methods=['POST'])
 def yukle():
     try:
+        # ... (kodun geri kalanı aynı)
         file_data = request.get_data()
         filename = request.headers.get('X-Dosya-Adi', 'liste.xlsx')
         if filename.endswith('.csv'):
@@ -51,6 +58,7 @@ def yukle():
     except Exception as e:
         return jsonify({"success": False, "hata": str(e)}), 400
 
+@app.route('/akis')
 @app.route('/api/akis')
 def akis():
     token = request.args.get('token')
