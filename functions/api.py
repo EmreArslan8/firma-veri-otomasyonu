@@ -52,29 +52,7 @@ def not_found(e):
         "message": "Bu rota Flask tarafindan bulunamadi."
     }), 404
 
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>', methods=['GET', 'POST', 'OPTIONS'])
-def catch_all(path):
-    # Bu rota her şeyi yakalar ve ilgili fonksiyonlara yönlendirir
-    if path.endswith('yukle'):
-        return yukle()
-    if path.endswith('akis'):
-        return akis()
-    if path.endswith('ping'):
-        return ping()
-    if path.endswith('debug'):
-        return debug()
-    
-    return jsonify({
-        "message": "API Calisiyor",
-        "path_received": path,
-        "method": request.method
-    })
-
-@app.route('/api/ping')
-def ping():
-    return jsonify({"status": "ok", "message": "Server is running"})
-
+@app.route('/yukle', methods=['POST', 'OPTIONS'])
 @app.route('/api/yukle', methods=['POST', 'OPTIONS'])
 def yukle():
     if request.method == 'OPTIONS':
@@ -107,6 +85,7 @@ def xlsx_uret(sonuclar):
     writer.close()
     return output.getvalue()
 
+@app.route('/akis')
 @app.route('/api/akis')
 def akis():
     token = request.args.get('token')
@@ -128,6 +107,7 @@ def akis():
     
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
+@app.route('/indir')
 @app.route('/api/indir')
 def indir():
     token = request.args.get('token')
