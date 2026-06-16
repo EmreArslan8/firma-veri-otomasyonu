@@ -33,42 +33,31 @@ def log_request_info():
     print(f"Request: {request.method} {request.path}")
     # print(f"Headers: {dict(request.headers)}")
 
-@app.route('/debug')
+@app.route('/api/debug')
 def debug():
     return jsonify({
+        "status": "online",
         "path": request.path,
-        "full_path": request.full_path,
-        "url": request.url,
-        "headers": dict(request.headers)
+        "headers": {k: v for k, v in request.headers.items() if "Cookie" not in k}
     })
-
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>', methods=['GET', 'POST', 'OPTIONS'])
-def catch_all(path):
-    # Vercel'den gelen yolları temizle ve ilgili fonksiyona yönlendir
-    clean_path = path.split('/')[-1]
-    
-    if clean_path == 'yukle':
-        return yukle()
-    if clean_path == 'akis':
-        return akis()
-    if clean_path == 'indir':
-        return indir()
-    if clean_path == 'ping':
-        return ping()
-    if clean_path == 'debug' or path == '':
-        return debug()
-    
-    return jsonify({
-        "error": "Not Found",
-        "message": f"'{path}' rotasi Flask tarafindan bulunamadi.",
-        "path": path,
-        "clean_path": clean_path
-    }), 404
 
 @app.route('/api/ping')
 def ping():
     return jsonify({"status": "ok", "message": "Server is running"})
+
+@app.route('/api/yukle', methods=['POST', 'OPTIONS'])
+def yukle_route():
+    if request.method == 'OPTIONS':
+        return '', 200
+    return yukle()
+
+@app.route('/api/akis')
+def akis_route():
+    return akis()
+
+@app.route('/api/indir')
+def indir_route():
+    return indir()
 
 def yukle():
     try:
