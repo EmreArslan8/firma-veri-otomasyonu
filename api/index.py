@@ -23,21 +23,18 @@ def veri_dogrula(firma_adi, index):
     telefon = f"+90 212 {random.randint(100, 999)} {random.randint(10, 99)} {random.randint(10, 99)}"
     return {"index": index, "firma": firma_adi, "site": url, "telefon": telefon, "durum": "Başarılı"}
 
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>', methods=['GET', 'POST', 'OPTIONS'])
-def catch_all(path):
+@app.route('/api/yukle', methods=['POST', 'OPTIONS'])
+def yukle_route():
     if request.method == 'OPTIONS': return '', 200
-    
-    # Yolun sonuna bakarak nereye gideceğine karar ver
-    if path.endswith('yukle'): return yukle()
-    if path.endswith('akis'): return akis()
-    if path.endswith('ping'): return ping()
-    
-    return jsonify({
-        "status": "online",
-        "received_path": path,
-        "message": "Firma Otomasyon API Calisiyor. Gecerli uclar: /yukle, /akis, /ping"
-    })
+    return yukle()
+
+@app.route('/api/akis')
+def akis_route():
+    return akis()
+
+@app.route('/api/ping')
+def ping_route():
+    return ping()
 
 def yukle():
     try:
