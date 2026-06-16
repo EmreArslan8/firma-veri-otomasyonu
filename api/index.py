@@ -23,9 +23,23 @@ def veri_dogrula(firma_adi, index):
     telefon = f"+90 212 {random.randint(100, 999)} {random.randint(10, 99)} {random.randint(10, 99)}"
     return {"index": index, "firma": firma_adi, "site": url, "telefon": telefon, "durum": "Başarılı"}
 
-@app.route('/api/yukle', methods=['POST', 'OPTIONS'])
-def yukle():
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>', methods=['GET', 'POST', 'OPTIONS'])
+def catch_all(path):
     if request.method == 'OPTIONS': return '', 200
+    
+    # Yolun sonuna bakarak nereye gideceğine karar ver
+    if path.endswith('yukle'): return yukle()
+    if path.endswith('akis'): return akis()
+    if path.endswith('ping'): return ping()
+    
+    return jsonify({
+        "status": "online",
+        "received_path": path,
+        "message": "Firma Otomasyon API Calisiyor. Gecerli uclar: /yukle, /akis, /ping"
+    })
+
+def yukle():
     try:
         file_data = request.get_data()
         token = str(uuid.uuid4())
@@ -40,7 +54,10 @@ def yukle():
     except Exception as e:
         return jsonify({"success": False, "hata": str(e)}), 400
 
-@app.route('/api/akis')
+@app.route('/api/ping')
+def ping():
+    return jsonify({"status": "ok", "message": "Vercel API Calisiyor"})
+
 def akis():
     token = request.args.get('token')
     if not token or token not in sessions:
@@ -54,10 +71,6 @@ def akis():
         yield "event: bitti\ndata: {}\n\n"
 
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
-
-@app.route('/api/ping')
-def ping():
-    return jsonify({"status": "ok", "message": "Vercel API Calisiyor"})
 
 # Vercel için app nesnesini dışa aktarıyoruz
 if __name__ == "__main__":
