@@ -1,15 +1,12 @@
-from flask import Flask, request, jsonify, Response, stream_with_context
-from flask_cors import CORS
-import time
-import random
 import json
 import uuid
+import time
+import random
 import pandas as pd
 import io
+from urllib.parse import urlparse, parse_qs
 
-app = Flask(__name__)
-CORS(app)
-
+# Basit bir bellek içi oturum saklama (Vercel'de kısa süreli çalışır, demo için uygundur)
 sessions = {}
 
 def temizle(s):
@@ -17,116 +14,71 @@ def temizle(s):
     return str(s).lower().translate(duzeltmeler).replace("_", "")
 
 def veri_dogrula(firma_adi, index):
-    time.sleep(random.uniform(0.3, 0.7))
+    time.sleep(random.uniform(0.1, 0.3))
     url = f"www.{temizle(firma_adi)}.com.tr"
     telefon = f"+90 212 {random.randint(100, 999)} {random.randint(10, 99)} {random.randint(10, 99)}"
-    return {
-        "index": index,
-        "firma": firma_adi,
-        "site": url,
-        "telefon": telefon,
-        "durum": "Başarılı"
-    }
+    return {"index": index, "firma": firma_adi, "site": url, "telefon": telefon, "durum": "Başarılı"}
 
-@app.before_request
-def log_request_info():
-    print(f"Request: {request.method} {request.path}")
-    # print(f"Headers: {dict(request.headers)}")
-
-@app.route('/api/debug')
-def debug():
-    return jsonify({
-        "status": "online",
-        "path": request.path,
-        "headers": {k: v for k, v in request.headers.items() if "Cookie" not in k}
-    })
-
-@app.route('/api/ping')
-@app.route('/ping')
-def ping():
-    return jsonify({"status": "ok", "message": "Server is running"})
-
-@app.route('/api/yukle', methods=['POST', 'OPTIONS'])
-@app.route('/yukle', methods=['POST', 'OPTIONS'])
-def yukle_route():
-    if request.method == 'OPTIONS':
-        return '', 200
-    return yukle()
-
-@app.route('/api/akis')
-@app.route('/akis')
-def akis_route():
-    return akis()
-
-@app.route('/api/indir')
-@app.route('/indir')
-def indir_route():
-    return indir()
-
-def yukle():
-    try:
-        file_data = request.get_data()
-        filename = request.headers.get('X-Dosya-Adi', 'liste.xlsx')
-        if filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(file_data))
-        else:
-            df = pd.read_excel(io.BytesIO(file_data))
-        firmalar = df.iloc[:, 0].dropna().tolist()
-        token = str(uuid.uuid4())
-        sessions[token] = firmalar
-        return jsonify({
-            "success": True, 
-            "token": token, 
-            "firmalar": firmalar[:20],
-            "toplam": len(firmalar),
-            "sinir": 20
-        })
-    except Exception as e:
-        return jsonify({"success": False, "hata": str(e)}), 400
-
-def xlsx_uret(sonuclar):
-    output = io.BytesIO()
-    writer = pd.ExcelWriter(output, engine='openpyxl')
-    df = pd.DataFrame(sonuclar)
-    df.to_excel(writer, index=False, sheet_name='Sonuçlar')
-    writer.close()
-    return output.getvalue()
-
-@app.route('/akis')
-@app.route('/api/akis')
-def akis():
-    token = request.args.get('token')
-    if not token or token not in sessions:
-        return "Hata: Gecersiz Token", 400
+def handler(request):
+    # Vercel'in isteği nasıl karşıladığını anla
+    path = request.path
+    method = request.method
     
-    firmalar = sessions[token][:20]
-    sonuclar = []
-    
-    def generate():
-        for i, firma in enumerate(firmalar):
-            result = veri_dogrula(firma, i)
-            sonuclar.append(result)
-            yield f"event: satir\ndata: {json.dumps(result)}\n\n"
+    # Rotaları manuel ayırıyoruz
+    if path.endswith('/yukle') and method == 'POST':
+        try:
+            file_data = request.get_data()
+            token = str(uuid.uuid4())
+            # Pandas ile oku
+            if b"PK" in file_data[:4]: # Excel kontrolü
+                df = pd.read_excel(io.BytesIO(file_data))
+            else:
+                df = pd.read_csv(io.BytesIO(file_data))
+            
+            firmalar = df.iloc[:, 0].dropna().tolist()
+            sessions[token] = firmalar
+            
+            return {
+                "statusCode": 200,
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps({"success": True, "token": token, "firmalar": firmalar[:20], "toplam": len(firmalar)})
+            }
+        except Exception as e:
+            return {"statusCode": 400, "body": json.dumps({"hata": str(e)})}
+
+    elif path.endswith('/akis'):
+        params = parse_qs(urlparse(request.url).query)
+        token = params.get('token', [None])[0]
         
-        # Sonuçları oturuma kaydet (indirme için)
-        sessions[token + "_sonuc"] = sonuclar
-        yield "event: bitti\ndata: {}\n\n"
-    
-    return Response(stream_with_context(generate()), mimetype="text/event-stream")
+        if not token or token not in sessions:
+            return {"statusCode": 400, "body": "Gecersiz Token"}
 
-@app.route('/indir')
-@app.route('/api/indir')
-def indir():
-    token = request.args.get('token')
-    sonuclar = sessions.get(token + "_sonuc")
-    if not sonuclar:
-        return "Dosya bulunamadı", 404
-    
-    xlsx_data = xlsx_uret(sonuclar)
-    return Response(
-        xlsx_data,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-disposition": "attachment; filename=firmalar_sonuc.xlsx"}
-    )
+        firmalar = sessions[token][:20]
+        
+        # SSE (Canlı Akış) için özel yanıt
+        def generate():
+            for i, firma in enumerate(firmalar):
+                result = veri_dogrula(firma, i)
+                yield f"event: satir\ndata: {json.dumps(result)}\n\n"
+            yield "event: bitti\ndata: {}\n\n"
 
-# Vercel, app nesnesini otomatik olarak bulur.
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive"
+            },
+            "body": "".join(list(generate())) # Vercel'de streaming bazen sınırlıdır, bu en güvenli yol
+        }
+
+    # Hiçbir rota eşleşmezse debug bilgisini dön
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps({
+            "mesaj": "API Calisiyor (Flask-siz)",
+            "path": path,
+            "method": method
+        })
+    }
