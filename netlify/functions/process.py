@@ -40,10 +40,17 @@ def debug():
         "path": request.path,
         "full_path": request.full_path,
         "url": request.url,
-        "base_url": request.base_url,
-        "url_root": request.url_root,
         "headers": dict(request.headers)
     })
+
+@app.errorhandler(404)
+def not_found(e):
+    print(f"404 Not Found: {request.path}")
+    return jsonify({
+        "error": "Not Found",
+        "path": request.path,
+        "message": "Bu rota Flask tarafindan bulunamadi."
+    }), 404
 
 @app.route('/ping')
 @app.route('/api/ping')
