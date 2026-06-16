@@ -52,16 +52,23 @@ def not_found(e):
         "message": "Bu rota Flask tarafindan bulunamadi."
     }), 404
 
+@app.route('/')
+@app.route('/api')
+def index():
+    return jsonify({"message": "Firma Otomasyon API Calisiyor", "endpoints": ["/yukle", "/akis", "/ping"]})
+
 @app.route('/ping')
 @app.route('/api/ping')
-@app.route('/.netlify/functions/process/ping')
+@app.route('/process/ping')
 def ping():
     return jsonify({"status": "ok", "message": "Server is running"})
 
 @app.route('/yukle', methods=['POST'])
 @app.route('/api/yukle', methods=['POST'])
-@app.route('/.netlify/functions/process/yukle', methods=['POST'])
+@app.route('/process/yukle', methods=['POST', 'OPTIONS'])
 def yukle():
+    if request.method == 'OPTIONS':
+        return '', 200
     try:
         file_data = request.get_data()
         filename = request.headers.get('X-Dosya-Adi', 'liste.xlsx')
@@ -92,11 +99,11 @@ def xlsx_uret(sonuclar):
 
 @app.route('/akis')
 @app.route('/api/akis')
-@app.route('/.netlify/functions/process/akis')
+@app.route('/process/akis')
 def akis():
     token = request.args.get('token')
     if not token or token not in sessions:
-        return "Hata", 400
+        return "Hata: Gecersiz Token", 400
     
     firmalar = sessions[token][:20]
     sonuclar = []
@@ -115,7 +122,7 @@ def akis():
 
 @app.route('/indir')
 @app.route('/api/indir')
-@app.route('/.netlify/functions/process/indir')
+@app.route('/process/indir')
 def indir():
     token = request.args.get('token')
     sonuclar = sessions.get(token + "_sonuc")
