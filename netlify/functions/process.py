@@ -31,14 +31,15 @@ def veri_dogrula(firma_adi, index):
 
 @app.route('/ping')
 @app.route('/api/ping')
+@app.route('/.netlify/functions/process/ping')
 def ping():
     return jsonify({"status": "ok", "message": "Server is running"})
 
 @app.route('/yukle', methods=['POST'])
 @app.route('/api/yukle', methods=['POST'])
+@app.route('/.netlify/functions/process/yukle', methods=['POST'])
 def yukle():
     try:
-        # ... (kodun geri kalanı aynı)
         file_data = request.get_data()
         filename = request.headers.get('X-Dosya-Adi', 'liste.xlsx')
         if filename.endswith('.csv'):
@@ -58,19 +59,52 @@ def yukle():
     except Exception as e:
         return jsonify({"success": False, "hata": str(e)}), 400
 
+def xlsx_uret(sonuclar):
+    output = io.BytesIO()
+    writer = pd.ExcelWriter(output, engine='openpyxl')
+    df = pd.DataFrame(sonuclar)
+    df.to_excel(writer, index=False, sheet_name='Sonuçlar')
+    writer.close()
+    return output.getvalue()
+
 @app.route('/akis')
 @app.route('/api/akis')
+@app.route('/.netlify/functions/process/akis')
 def akis():
     token = request.args.get('token')
     if not token or token not in sessions:
         return "Hata", 400
+    
     firmalar = sessions[token][:20]
+    sonuclar = []
+    
     def generate():
         for i, firma in enumerate(firmalar):
             result = veri_dogrula(firma, i)
+            sonuclar.append(result)
             yield f"event: satir\ndata: {json.dumps(result)}\n\n"
+        
+        # Sonuçları oturuma kaydet (indirme için)
+        sessions[token + "_sonuc"] = sonuclar
         yield "event: bitti\ndata: {}\n\n"
+    
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
+
+@app.route('/indir')
+@app.route('/api/indir')
+@app.route('/.netlify/functions/process/indir')
+def indir():
+    token = request.args.get('token')
+    sonuclar = sessions.get(token + "_sonuc")
+    if not sonuclar:
+        return "Dosya bulunamadı", 404
+    
+    xlsx_data = xlsx_uret(sonuclar)
+    return Response(
+        xlsx_data,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-disposition": "attachment; filename=firmalar_sonuc.xlsx"}
+    )
 
 # Netlify için handler
 def handler(event, context):

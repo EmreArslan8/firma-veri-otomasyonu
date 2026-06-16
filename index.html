@@ -198,7 +198,7 @@
                 setStatus('uploading');
                 setResults({}); setProcessedCount(0); setProgress(0); setElapsedTime(0); setStartTime(null);
                 try {
-                    const res = await fetch('/.netlify/functions/process/yukle', {
+                    const res = await fetch('/api/yukle', {
                         method: 'POST',
                         headers: { 'X-Dosya-Adi': encodeURIComponent(file.name) },
                         body: file
@@ -211,7 +211,7 @@
                     addLog(`${data.toplam} firma okundu${data.toplam > data.sinir ? ` (demo: ilk ${data.sinir})` : ''}. Tarama başlıyor...`, 'success');
                     setStatus('processing');
 
-                    const ev = new EventSource('/.netlify/functions/process/akis?token=' + data.token);
+                    const ev = new EventSource('/api/akis?token=' + data.token);
                     ev.addEventListener('satir', (e) => {
                         const r = JSON.parse(e.data);
                         setActiveRow(r.firma);
