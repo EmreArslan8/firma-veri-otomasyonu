@@ -53,9 +53,9 @@ def yukle():
         return jsonify({
             "success": True, 
             "token": token, 
-            "firmalar": firmalar[:10], # Frontend'de liste için ilk 10'u yolla
+            "firmalar": firmalar[:20], # Frontend'de liste için ilk 20'yi yolla
             "toplam": len(firmalar),
-            "sinir": 10
+            "sinir": 20
         })
     except Exception as e:
         return jsonify({"success": False, "hata": str(e)}), 400
@@ -66,7 +66,7 @@ def akis():
     if not token or token not in sessions:
         return "Hata", 400
         
-    firmalar = sessions[token][:10] # Demo sınırlaması
+    firmalar = sessions[token][:20] # Demo sınırlaması
     
     def generate():
         for i, firma in enumerate(firmalar):
