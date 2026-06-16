@@ -42,20 +42,24 @@ def debug():
     })
 
 @app.route('/api/ping')
+@app.route('/ping')
 def ping():
     return jsonify({"status": "ok", "message": "Server is running"})
 
 @app.route('/api/yukle', methods=['POST', 'OPTIONS'])
+@app.route('/yukle', methods=['POST', 'OPTIONS'])
 def yukle_route():
     if request.method == 'OPTIONS':
         return '', 200
     return yukle()
 
 @app.route('/api/akis')
+@app.route('/akis')
 def akis_route():
     return akis()
 
 @app.route('/api/indir')
+@app.route('/indir')
 def indir_route():
     return indir()
 
