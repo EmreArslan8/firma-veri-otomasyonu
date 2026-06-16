@@ -29,6 +29,22 @@ def veri_dogrula(firma_adi, index):
         "durum": "Başarılı"
     }
 
+@app.before_request
+def log_request_info():
+    print(f"Request: {request.method} {request.path}")
+    # print(f"Headers: {dict(request.headers)}")
+
+@app.route('/debug')
+def debug():
+    return jsonify({
+        "path": request.path,
+        "full_path": request.full_path,
+        "url": request.url,
+        "base_url": request.base_url,
+        "url_root": request.url_root,
+        "headers": dict(request.headers)
+    })
+
 @app.route('/ping')
 @app.route('/api/ping')
 @app.route('/.netlify/functions/process/ping')

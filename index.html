@@ -198,12 +198,29 @@
                 setStatus('uploading');
                 setResults({}); setProcessedCount(0); setProgress(0); setElapsedTime(0); setStartTime(null);
                 try {
+                    console.log('Sending request to /api/yukle...', { fileName: file.name, fileSize: file.size });
                     const res = await fetch('/api/yukle', {
                         method: 'POST',
                         headers: { 'X-Dosya-Adi': encodeURIComponent(file.name) },
                         body: file
                     });
+                    
+                    console.log('Response received:', { 
+                        status: res.status, 
+                        statusText: res.statusText,
+                        headers: Object.fromEntries(res.headers.entries())
+                    });
+
+                    if (!res.ok) {
+                        const text = await res.text();
+                        console.error('Request failed with status:', res.status, 'Body:', text);
+                        addLog(`Sunucu Hatası (${res.status}): ` + text.substring(0, 100), 'error');
+                        setStatus('idle');
+                        return;
+                    }
+
                     const data = await res.json();
+                    console.log('Data parsed successfully:', data);
                     if (data.hata) { addLog('Hata: ' + data.hata, 'error'); setStatus('idle'); return; }
 
                     setCompanies(data.firmalar);
