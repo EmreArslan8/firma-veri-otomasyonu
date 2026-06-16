@@ -52,10 +52,24 @@ def not_found(e):
         "message": "Bu rota Flask tarafindan bulunamadi."
     }), 404
 
-@app.route('/')
-@app.route('/api')
-def index():
-    return jsonify({"message": "Firma Otomasyon API Calisiyor", "endpoints": ["/yukle", "/akis", "/ping"]})
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>', methods=['GET', 'POST', 'OPTIONS'])
+def catch_all(path):
+    # Bu rota her şeyi yakalar ve ilgili fonksiyonlara yönlendirir
+    if path.endswith('yukle'):
+        return yukle()
+    if path.endswith('akis'):
+        return akis()
+    if path.endswith('ping'):
+        return ping()
+    if path.endswith('debug'):
+        return debug()
+    
+    return jsonify({
+        "message": "API Calisiyor",
+        "path_received": path,
+        "method": request.method
+    })
 
 @app.route('/api/ping')
 def ping():
