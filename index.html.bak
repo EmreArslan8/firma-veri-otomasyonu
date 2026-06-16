@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firma Veri Otomasyonu | Profesyonel Veri Doğrulama</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0b;
+            --panel: #141417;
+            --accent: #00ff88;
+            --accent-muted: rgba(0, 255, 136, 0.1);
+            --border: #27272a;
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: 'Bricolage Grotesque', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .glass {
+            background: rgba(20, 20, 23, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+        }
+
+        .industrial-border {
+            position: relative;
+        }
+
+        .industrial-border::before {
+            content: '';
+            position: absolute;
+            top: -1px;
+            left: -1px;
+            right: -1px;
+            bottom: -1px;
+            background: linear-gradient(45deg, var(--accent), transparent, var(--accent));
+            z-index: -1;
+            opacity: 0.1;
+            border-radius: inherit;
+        }
+
+        .scan-line {
+            width: 100%;
+            height: 2px;
+            background: var(--accent);
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0.5;
+            box-shadow: 0 0 15px var(--accent);
+            animation: scan 3s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+
+        .grid-bg {
+            background-image: radial-gradient(var(--border) 1px, transparent 1px);
+            background-size: 32px 32px;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--accent);
+            background: var(--accent-muted);
+        }
+    </style>
+</head>
+<body class="grid-bg">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef } = React;
+        const h = React.createElement;
+
+        // framer-motion yerine hafif shim — görsel animasyonlar zaten CSS'te
+        const motion = new Proxy({}, {
+            get: (_, tag) => ({ initial, animate, transition, exit, onAnimationComplete,
+                                 whileHover, whileTap, layout, style, ...rest }) => {
+                const s = { ...(style || {}) };
+                if (animate && animate.width != null)
+                    s.width = typeof animate.width === 'number' ? animate.width + '%' : animate.width;
+                return h(tag, { ...rest, style: s });
+            }
+        });
+        const AnimatePresence = ({ children }) => children;
+
+        // lucide-react yerine inline SVG ikon fabrikası
+        const mkIcon = (els) => ({ size = 24, className, ...rest }) =>
+            h('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
+                       stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round',
+                       strokeLinejoin: 'round', className, ...rest },
+              els.map((e, i) => h(e[0], { key: i, ...e[1] })));
+        const P = (d) => ['path', { d }];
+
+        const Upload          = mkIcon([P('M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'), ['polyline',{points:'17 8 12 3 7 8'}], ['line',{x1:12,y1:3,x2:12,y2:15}]]);
+        const ArrowRight      = mkIcon([['line',{x1:5,y1:12,x2:19,y2:12}], ['polyline',{points:'12 5 19 12 12 19'}]]);
+        const Loader2         = mkIcon([P('M21 12a9 9 0 1 1-6.219-8.56')]);
+        const RefreshCw       = mkIcon([P('M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'), P('M21 3v5h-5'), P('M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'), P('M8 16H3v5')]);
+        const Database        = mkIcon([['ellipse',{cx:12,cy:5,rx:9,ry:3}], P('M3 5v14a9 3 0 0 0 18 0V5'), P('M3 12a9 3 0 0 0 18 0')]);
+        const Download        = mkIcon([P('M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'), ['polyline',{points:'7 10 12 15 17 10'}], ['line',{x1:12,y1:15,x2:12,y2:3}]]);
+        const CheckCircle2    = mkIcon([P('M22 11.08V12a10 10 0 1 1-5.93-9.14'), ['polyline',{points:'22 4 12 14.01 9 11.01'}]]);
+        const Terminal        = mkIcon([['polyline',{points:'4 17 10 11 4 5'}], ['line',{x1:12,y1:19,x2:20,y2:19}]]);
+        const Globe           = mkIcon([['circle',{cx:12,cy:12,r:10}], ['line',{x1:2,y1:12,x2:22,y2:12}], P('M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z')]);
+        const ShieldCheck     = mkIcon([P('M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'), ['polyline',{points:'9 12 11 14 15 10'}]]);
+        const Zap             = mkIcon([['polygon',{points:'13 2 3 14 12 14 11 22 21 10 12 10 13 2'}]]);
+        const FileSpreadsheet = mkIcon([P('M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z'), ['polyline',{points:'14 2 14 8 20 8'}], ['line',{x1:8,y1:13,x2:16,y2:13}], ['line',{x1:8,y1:17,x2:16,y2:17}]]);
+        const Search          = mkIcon([['circle',{cx:11,cy:11,r:8}], ['line',{x1:21,y1:21,x2:16.65,y2:16.65}]]);
+        const Mail            = mkIcon([['rect',{x:2,y:4,width:20,height:16,rx:2}], P('m22 7-10 5L2 7')]);
+        const MapPin          = mkIcon([P('M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'), ['circle',{cx:12,cy:10,r:3}]]);
+        const BarChart3       = mkIcon([P('M3 3v18h18'), P('M18 17V9'), P('M13 17V5'), P('M8 17v-3')]);
+
+        const App = () => {
+            const [status, setStatus] = useState('idle'); // idle, uploading, processing, completed
+            const [progress, setProgress] = useState(0);
+            const [processedCount, setProcessedCount] = useState(0);
+            const [logs, setLogs] = useState([]);
+            const [activeRow, setActiveRow] = useState(null);
+            const [companies, setCompanies] = useState([]);   // yüklenen firma adları
+            const [results, setResults] = useState({});       // index -> {site,eposta,telefon,durum}
+            const [token, setToken] = useState(null);
+            const fileRef = useRef(null);
+
+            const addLog = (msg, type = 'info') => {
+                setLogs(prev => [{ id: Date.now() + Math.random(), msg, type, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 12));
+            };
+
+            // Gerçek dosya yükleme + canlı (SSE) işleme
+            const handleFile = async (file) => {
+                if (!file) return;
+                setStatus('uploading');
+                setResults({}); setProcessedCount(0); setProgress(0);
+                addLog(`${file.name} yükleniyor...`);
+                try {
+                    const res = await fetch('/api/yukle', {
+                        method: 'POST',
+                        headers: { 'X-Dosya-Adi': encodeURIComponent(file.name) },
+                        body: file
+                    });
+                    const data = await res.json();
+                    if (data.hata) { addLog('Hata: ' + data.hata, 'error'); setStatus('idle'); return; }
+
+                    setCompanies(data.firmalar);
+                    setToken(data.token);
+                    addLog(`${data.toplam} firma okundu${data.toplam > data.sinir ? ` (demo: ilk ${data.sinir})` : ''}. Tarama başlıyor...`, 'success');
+                    setStatus('processing');
+
+                    const ev = new EventSource('/api/akis?token=' + data.token);
+                    ev.addEventListener('satir', (e) => {
+                        const r = JSON.parse(e.data);
+                        setActiveRow(r.firma);
+                        setResults(prev => ({ ...prev, [r.index]: r }));
+                        setProcessedCount(r.index + 1);
+                        setProgress(((r.index + 1) / data.firmalar.length) * 100);
+                        addLog(`${r.firma} → ${r.site || 'site bulunamadı'}`, r.site ? 'success' : 'info');
+                    });
+                    ev.addEventListener('bitti', () => {
+                        ev.close(); setActiveRow(null); setStatus('completed');
+                        addLog('Tüm veriler tamamlandı. Excel indirmeye hazır.', 'success');
+                    });
+                    ev.onerror = () => { ev.close(); };
+                } catch (err) {
+                    addLog('Bağlantı hatası: ' + err.message, 'error');
+                    setStatus('idle');
+                }
+            };
+
+            return (
+                <div class="min-h-screen p-4 md:p-8 max-w-7xl mx-auto">
+                    {/* Header */}
+                    <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+                        <div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                                <span class="mono text-xs text-green-500 tracking-widest uppercase font-bold">Data Engine v4.2.0</span>
+                            </div>
+                            <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight mb-2">
+                                <span class="text-white">Firma Veri</span> <span class="text-green-500">Otomasyonu</span>
+                            </h1>
+                            <p class="text-zinc-400 max-w-2xl text-lg">
+                                5.000+ satırlık Excel listelerinizi saniyeler içinde kamuya açık kaynaklarla doğrulayın, 
+                                eksik iletişim ve web bilgilerini yapay zeka destekli botlarla tamamlayın.
+                            </p>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="glass p-4 rounded-xl border border-zinc-800">
+                                <div class="text-xs text-zinc-500 mb-1 mono">TOPLAM KAYIT</div>
+                                <div class="text-2xl font-bold mono tracking-tighter">~5,000</div>
+                            </div>
+                            <div class="glass p-4 rounded-xl border border-zinc-800">
+                                <div class="text-xs text-zinc-500 mb-1 mono">DOĞRULUK ORANI</div>
+                                <div class="text-2xl font-bold mono tracking-tighter text-green-500">99.2%</div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        {/* Main Interaction Area */}
+                        <div class="lg:col-span-8 space-y-8">
+                            {status === 'idle' && (
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    class="upload-zone rounded-3xl p-12 flex flex-col items-center justify-center text-center group cursor-pointer"
+                                    onClick={() => fileRef.current && fileRef.current.click()}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); }}
+                                >
+                                    <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.xlsm"
+                                        style={{ display: 'none' }}
+                                        onChange={(e) => handleFile(e.target.files[0])} />
+                                    <div class="w-20 h-20 bg-zinc-900 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500 border border-zinc-800">
+                                        <Upload class="text-green-500 w-10 h-10" />
+                                    </div>
+                                    <h3 class="text-2xl font-bold mb-2">Excel veya CSV Dosyasını Sürükleyin</h3>
+                                    <p class="text-zinc-500 mb-8 max-w-md">
+                                        Firma isimlerinin bulunduğu sütunu içeren .xlsx, .xls veya .csv dosyanızı buraya bırakın.
+                                    </p>
+                                    <button class="bg-white text-black px-8 py-4 rounded-full font-bold flex items-center gap-2 hover:bg-green-500 hover:scale-105 transition-all">
+                                        Dosya Seçin <ArrowRight size={20} />
+                                    </button>
+                                </motion.div>
+                            )}
+
+                            {status === 'uploading' && (
+                                <div class="glass rounded-3xl p-12 flex flex-col items-center justify-center text-center">
+                                    <Loader2 class="text-green-500 w-12 h-12 animate-spin mb-6" />
+                                    <h3 class="text-2xl font-bold mb-2">Dosya Analiz Ediliyor...</h3>
+                                    <p class="text-zinc-500 mb-6">Sütun başlıkları ve veri yapısı kontrol ediliyor.</p>
+                                    <div class="w-full max-w-md bg-zinc-900 h-2 rounded-full overflow-hidden">
+                                        <motion.div
+                                            initial={{ width: 0 }}
+                                            animate={{ width: "90%" }}
+                                            transition={{ duration: 1.5 }}
+                                            class="h-full bg-green-500 shadow-[0_0_10px_#00ff88]"
+                                        ></motion.div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {(status === 'processing' || status === 'completed') && (
+                                <div class="space-y-6">
+                                    {/* Progress Card */}
+                                    <div class="glass rounded-3xl p-6 border-l-4 border-l-green-500 relative overflow-hidden">
+                                        {status === 'processing' && <div class="scan-line"></div>}
+                                        <div class="flex justify-between items-center mb-4">
+                                            <div class="flex items-center gap-3">
+                                                <div class="p-2 bg-green-500/10 rounded-lg">
+                                                    <RefreshCw class={`text-green-500 ${status === 'processing' ? 'animate-spin' : ''}`} size={20} />
+                                                </div>
+                                                <div>
+                                                    <div class="text-sm text-zinc-500 mono tracking-tighter">İŞLEM DURUMU</div>
+                                                    <div class="font-bold">{status === 'processing' ? 'Veriler Tamamlanıyor...' : 'İşlem Başarıyla Tamamlandı!'}</div>
+                                                </div>
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="text-sm text-zinc-500 mono uppercase tracking-tighter">İlerleme</div>
+                                                <div class="text-2xl font-bold mono text-green-500">{Math.round(progress)}%</div>
+                                            </div>
+                                        </div>
+                                        <div class="w-full bg-zinc-900 h-3 rounded-full overflow-hidden mb-2">
+                                            <motion.div 
+                                                animate={{ width: `${progress}%` }}
+                                                class="h-full bg-green-500 shadow-[0_0_15px_#00ff88]"
+                                            ></motion.div>
+                                        </div>
+                                        <div class="flex justify-between text-xs mono text-zinc-500">
+                                            <span>İşlenen: {processedCount} / {companies.length}</span>
+                                            <span>Kalan Süre: ~{Math.max(0, (companies.length - processedCount) * 2)}sn</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Table Simulation */}
+                                    <div class="glass rounded-3xl overflow-hidden border border-zinc-800">
+                                        <div class="p-4 bg-zinc-900/50 border-b border-zinc-800 flex justify-between items-center">
+                                            <div class="flex items-center gap-2">
+                                                <Database size={16} class="text-zinc-500" />
+                                                <span class="text-sm font-bold mono text-zinc-400 tracking-tighter uppercase">Canlı Veri Akışı</span>
+                                            </div>
+                                            {status === 'completed' && token && (
+                                                <motion.a
+                                                    href={'/api/indir?token=' + token}
+                                                    initial={{ scale: 0.9, opacity: 0 }}
+                                                    animate={{ scale: 1, opacity: 1 }}
+                                                    class="bg-green-500 text-black px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                                                >
+                                                    <Download size={14} /> EXCEL OLARAK İNDİR
+                                                </motion.a>
+                                            )}
+                                        </div>
+                                        <div class="overflow-x-auto">
+                                            <table class="w-full text-left mono text-sm">
+                                                <thead>
+                                                    <tr class="text-zinc-500 border-b border-zinc-800 bg-zinc-900/20">
+                                                        <th class="p-4 font-medium uppercase tracking-tighter">Firma İsmi</th>
+                                                        <th class="p-4 font-medium uppercase tracking-tighter">Web Sitesi</th>
+                                                        <th class="p-4 font-medium uppercase tracking-tighter">Telefon</th>
+                                                        <th class="p-4 font-medium uppercase tracking-tighter">Durum</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {companies.map((company, idx) => (
+                                                        <tr key={idx} class={`border-b border-zinc-800/50 transition-colors ${idx < processedCount ? 'bg-green-500/5' : ''} ${activeRow === company ? 'bg-zinc-800/50' : ''}`}>
+                                                            <td class="p-4 font-bold text-white">{company}</td>
+                                                            <td class="p-4 text-zinc-400">
+                                                                {results[idx] ? (
+                                                                    results[idx].site
+                                                                        ? <a href={results[idx].site} target="_blank" class="text-green-400 hover:underline">{results[idx].site.replace(/^https?:\/\//, '')}</a>
+                                                                        : <span class="text-zinc-600">—</span>
+                                                                ) : (
+                                                                    <span class="opacity-20">bekliyor...</span>
+                                                                )}
+                                                            </td>
+                                                            <td class="p-4 text-zinc-400">
+                                                                {results[idx] ? (
+                                                                    <span>{results[idx].telefon || results[idx].eposta || '—'}</span>
+                                                                ) : (
+                                                                    <span class="opacity-20">bekliyor...</span>
+                                                                )}
+                                                            </td>
+                                                            <td class="p-4">
+                                                                {idx < processedCount ? (
+                                                                    <div class="flex items-center gap-2 text-green-500">
+                                                                        <CheckCircle2 size={16} />
+                                                                        <span class="text-xs font-bold uppercase tracking-widest">TAMAM</span>
+                                                                    </div>
+                                                                ) : activeRow === company ? (
+                                                                    <div class="flex items-center gap-2 text-yellow-500 animate-pulse">
+                                                                        <Loader2 size={16} class="animate-spin" />
+                                                                        <span class="text-xs font-bold uppercase tracking-widest">TARANIYOR</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span class="text-zinc-700 text-xs font-bold uppercase tracking-widest">SIRADA</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Sidebar: Console & Features */}
+                        <div class="lg:col-span-4 space-y-6">
+                            {/* Terminal Console */}
+                            <div class="glass rounded-3xl p-6 h-[400px] flex flex-col border border-zinc-800 bg-black/40">
+                                <div class="flex items-center gap-2 mb-4 border-b border-zinc-800 pb-2">
+                                    <Terminal size={16} class="text-green-500" />
+                                    <span class="mono text-xs font-bold text-green-500 tracking-widest uppercase">Process Terminal</span>
+                                </div>
+                                <div class="flex-1 overflow-y-auto space-y-2 pr-2">
+                                    {logs.length === 0 ? (
+                                        <div class="text-zinc-700 mono text-xs">Awaiting process initiation...</div>
+                                    ) : (
+                                        logs.map(log => (
+                                            <div key={log.id} class="mono text-[10px] leading-tight">
+                                                <span class="text-zinc-600">[{log.time}]</span>{' '}
+                                                <span class={log.type === 'success' ? 'text-green-500' : 'text-zinc-400'}>
+                                                    {log.msg}
+                                                </span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Key Value Propositions */}
+                            <div class="space-y-4">
+                                <div class="glass p-5 rounded-2xl border border-zinc-800 flex gap-4 items-start">
+                                    <div class="p-2 bg-blue-500/10 rounded-lg"><Globe class="text-blue-500" size={20} /></div>
+                                    <div>
+                                        <h4 class="font-bold text-sm mb-1">Akıllı Web Tarama</h4>
+                                        <p class="text-xs text-zinc-500 leading-relaxed">Resmi web sitelerini ve kamuya açık kurumsal bilgileri %99 doğrulukla tespit eder.</p>
+                                    </div>
+                                </div>
+                                <div class="glass p-5 rounded-2xl border border-zinc-800 flex gap-4 items-start">
+                                    <div class="p-2 bg-purple-500/10 rounded-lg"><ShieldCheck class="text-purple-500" size={20} /></div>
+                                    <div>
+                                        <h4 class="font-bold text-sm mb-1">KVKK Uyumlu</h4>
+                                        <p class="text-xs text-zinc-500 leading-relaxed">Yalnızca kamuya açık kurumsal verileri işler, kişisel veri güvenliğini ihlal etmez.</p>
+                                    </div>
+                                </div>
+                                <div class="glass p-5 rounded-2xl border border-zinc-800 flex gap-4 items-start">
+                                    <div class="p-2 bg-yellow-500/10 rounded-lg"><Zap class="text-yellow-500" size={20} /></div>
+                                    <div>
+                                        <h4 class="font-bold text-sm mb-1">Yüksek Performans</h4>
+                                        <p class="text-xs text-zinc-500 leading-relaxed">5.000 satırlık bir listeyi manuel çalışmaya göre 100 kat daha hızlı tamamlar.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Features Footer */}
+                    <footer class="mt-20 pt-12 border-t border-zinc-900 grid grid-cols-1 md:grid-cols-3 gap-12 pb-12">
+                        <div>
+                            <div class="flex items-center gap-2 mb-4">
+                                <FileSpreadsheet class="text-green-500" size={24} />
+                                <span class="font-bold text-xl tracking-tighter">DATA<span class="text-green-500">OPTIMA</span></span>
+                            </div>
+                            <p class="text-sm text-zinc-500 leading-relaxed">
+                                Kurumsal veri yönetimi ve temizliği için geliştirilmiş endüstriyel otomasyon çözümü. 
+                                Karmaşık listelerinizi düzenli, güncel ve hatasız hale getirin.
+                            </p>
+                        </div>
+                        <div class="col-span-2 grid grid-cols-2 md:grid-cols-4 gap-8">
+                            <div>
+                                <h5 class="font-bold text-xs uppercase tracking-widest text-zinc-400 mb-4">Servisler</h5>
+                                <ul class="text-xs text-zinc-600 space-y-2">
+                                    <li>Veri Doğrulama</li>
+                                    <li>İletişim Tamamlama</li>
+                                    <li>Sektör Analizi</li>
+                                    <li>Excel Optimizasyonu</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="font-bold text-xs uppercase tracking-widest text-zinc-400 mb-4">Teknoloji</h5>
+                                <ul class="text-xs text-zinc-600 space-y-2">
+                                    <li>Python Automation</li>
+                                    <li>Web Scraping</li>
+                                    <li>AI Data Cleaning</li>
+                                    <li>Cloud Engine</li>
+                                </ul>
+                            </div>
+                            <div class="col-span-2">
+                                <div class="glass p-6 rounded-3xl border border-zinc-800">
+                                    <h5 class="font-bold mb-2">Hazır mısınız?</h5>
+                                    <p class="text-xs text-zinc-500 mb-4">Kendi veri setinizi test etmek için hemen iletişime geçin.</p>
+                                    <div class="flex gap-2">
+                                        <input type="text" placeholder="E-posta adresiniz" class="bg-zinc-900 border border-zinc-800 rounded-full px-4 py-2 text-xs flex-1 outline-none focus:border-green-500" />
+                                        <button class="bg-white text-black px-4 py-2 rounded-full text-xs font-bold">Gönder</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
