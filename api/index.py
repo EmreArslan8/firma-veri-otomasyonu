@@ -6,7 +6,6 @@ import json
 import uuid
 import pandas as pd
 import io
-import serverless_wsgi
 
 app = Flask(__name__)
 CORS(app)
@@ -122,6 +121,4 @@ def indir():
         headers={"Content-disposition": "attachment; filename=firmalar_sonuc.xlsx"}
     )
 
-# Netlify için handler
-def handler(event, context):
-    return serverless_wsgi.handle_request(app, event, context)
+# Vercel, app nesnesini otomatik olarak bulur.
