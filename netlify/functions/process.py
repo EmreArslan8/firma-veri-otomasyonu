@@ -57,15 +57,11 @@ def not_found(e):
 def index():
     return jsonify({"message": "Firma Otomasyon API Calisiyor", "endpoints": ["/yukle", "/akis", "/ping"]})
 
-@app.route('/ping')
 @app.route('/api/ping')
-@app.route('/process/ping')
 def ping():
     return jsonify({"status": "ok", "message": "Server is running"})
 
-@app.route('/yukle', methods=['POST'])
-@app.route('/api/yukle', methods=['POST'])
-@app.route('/process/yukle', methods=['POST', 'OPTIONS'])
+@app.route('/api/yukle', methods=['POST', 'OPTIONS'])
 def yukle():
     if request.method == 'OPTIONS':
         return '', 200
@@ -97,9 +93,7 @@ def xlsx_uret(sonuclar):
     writer.close()
     return output.getvalue()
 
-@app.route('/akis')
 @app.route('/api/akis')
-@app.route('/process/akis')
 def akis():
     token = request.args.get('token')
     if not token or token not in sessions:
@@ -120,9 +114,7 @@ def akis():
     
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
-@app.route('/indir')
 @app.route('/api/indir')
-@app.route('/process/indir')
 def indir():
     token = request.args.get('token')
     sonuclar = sessions.get(token + "_sonuc")

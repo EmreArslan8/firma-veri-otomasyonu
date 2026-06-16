@@ -7,13 +7,7 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/process/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/process/*"
-  to = "/.netlify/functions/process/:splat"
+  to = "/.netlify/functions/process"
   status = 200
   force = true
 
