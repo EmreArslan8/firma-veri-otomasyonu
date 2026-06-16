@@ -160,18 +160,43 @@
             const [companies, setCompanies] = useState([]);   // yüklenen firma adları
             const [results, setResults] = useState({});       // index -> {site,eposta,telefon,durum}
             const [token, setToken] = useState(null);
+            const [startTime, setStartTime] = useState(null);
+            const [elapsedTime, setElapsedTime] = useState(0);
             const fileRef = useRef(null);
+            const timerRef = useRef(null);
 
             const addLog = (msg, type = 'info') => {
                 setLogs(prev => [{ id: Date.now() + Math.random(), msg, type, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 12));
+            };
+
+            // Geçen süreyi güncelleyen effect
+            useEffect(() => {
+                if (status === 'processing') {
+                    if (!startTime) setStartTime(Date.now());
+                    timerRef.current = setInterval(() => {
+                        setElapsedTime(Math.floor((Date.now() - (startTime || Date.now())) / 1000));
+                    }, 1000);
+                } else if (status === 'completed' || status === 'idle') {
+                    clearInterval(timerRef.current);
+                }
+                return () => clearInterval(timerRef.current);
+            }, [status, startTime]);
+
+            // Tahmini kalan süreyi hesapla
+            const getRemainingTime = () => {
+                if (processedCount === 0 || status !== 'processing') return '--';
+                const timePerItem = elapsedTime / processedCount;
+                const remainingItems = companies.length - processedCount;
+                const remainingSeconds = Math.round(timePerItem * remainingItems);
+                if (remainingSeconds < 0) return 0;
+                return remainingSeconds;
             };
 
             // Gerçek dosya yükleme + canlı (SSE) işleme
             const handleFile = async (file) => {
                 if (!file) return;
                 setStatus('uploading');
-                setResults({}); setProcessedCount(0); setProgress(0);
-                addLog(`${file.name} yükleniyor...`);
+                setResults({}); setProcessedCount(0); setProgress(0); setElapsedTime(0); setStartTime(null);
                 try {
                     const res = await fetch('/api/yukle', {
                         method: 'POST',
@@ -307,7 +332,10 @@
                                         </div>
                                         <div className="flex justify-between text-xs mono text-zinc-500">
                                             <span>İşlenen: {processedCount} / {companies.length}</span>
-                                            <span>Kalan Süre: ~{Math.max(0, (companies.length - processedCount) * 2)}sn</span>
+                                            <div className="flex gap-4">
+                                                <span>Geçen Süre: {elapsedTime}sn</span>
+                                                <span>Kalan: ~{getRemainingTime()}sn</span>
+                                            </div>
                                         </div>
                                     </div>
 
