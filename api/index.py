@@ -42,20 +42,35 @@ def debug():
         "headers": dict(request.headers)
     })
 
-@app.errorhandler(404)
-def not_found(e):
-    print(f"404 Not Found: {request.path}")
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>', methods=['GET', 'POST', 'OPTIONS'])
+def catch_all(path):
+    # Vercel'den gelen yolları temizle ve ilgili fonksiyona yönlendir
+    clean_path = path.split('/')[-1]
+    
+    if clean_path == 'yukle':
+        return yukle()
+    if clean_path == 'akis':
+        return akis()
+    if clean_path == 'indir':
+        return indir()
+    if clean_path == 'ping':
+        return ping()
+    if clean_path == 'debug' or path == '':
+        return debug()
+    
     return jsonify({
         "error": "Not Found",
-        "path": request.path,
-        "message": "Bu rota Flask tarafindan bulunamadi."
+        "message": f"'{path}' rotasi Flask tarafindan bulunamadi.",
+        "path": path,
+        "clean_path": clean_path
     }), 404
 
-@app.route('/yukle', methods=['POST', 'OPTIONS'])
-@app.route('/api/yukle', methods=['POST', 'OPTIONS'])
+@app.route('/api/ping')
+def ping():
+    return jsonify({"status": "ok", "message": "Server is running"})
+
 def yukle():
-    if request.method == 'OPTIONS':
-        return '', 200
     try:
         file_data = request.get_data()
         filename = request.headers.get('X-Dosya-Adi', 'liste.xlsx')
